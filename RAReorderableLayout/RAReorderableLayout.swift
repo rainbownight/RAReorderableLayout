@@ -264,7 +264,64 @@ public class RAReorderableLayout: UICollectionViewFlowLayout, UIGestureRecognize
                         self.invalidateDisplayLink()
                 }
         }
-        
+  
+        private func useOtherWayToFindDescIndexPath(atIndexPath: NSIndexPath?) -> NSIndexPath? {
+          if atIndexPath == nil {
+            return nil
+          }
+          
+          var toIndexPath: NSIndexPath?
+          let layoutAttrsInRect = layoutAttributesForElementsInRect(collectionView!.bounds)
+          if layoutAttrsInRect == nil {
+            return nil
+          }
+          
+          let point = cellFakeView!.center
+          var closestDist: Float = Float.infinity
+          
+          for layoutAttr: UICollectionViewLayoutAttributes in layoutAttrsInRect! {
+            let xd = layoutAttr.center.x - point.x;
+            let yd = layoutAttr.center.y - point.y;
+            let dist = sqrtf(Float(xd*xd) + Float(yd*yd))
+            if (dist < closestDist) {
+              closestDist = dist
+              toIndexPath = layoutAttr.indexPath
+            }
+          }
+          
+          let sections = collectionView!.numberOfSections()
+          var i: Int
+          for i = 0; i < sections; i++ {
+            if i == atIndexPath!.section {
+              continue
+            }
+            
+            let items = collectionView!.numberOfItemsInSection(i)
+            let nextIndexPath = NSIndexPath.init(forRow: items, inSection: i)
+            var layoutAttr: UICollectionViewLayoutAttributes!
+            var xd: Float
+            var yd: Float
+            
+            if items > 0 {
+              layoutAttr = layoutAttributesForItemAtIndexPath(nextIndexPath)
+              xd = Float(layoutAttr.center.x - point.x)
+              yd = Float(layoutAttr.center.y - point.y)
+            } else {
+              layoutAttr = layoutAttributesForSupplementaryViewOfKind(UICollectionElementKindSectionHeader, atIndexPath: nextIndexPath)
+              xd = Float(layoutAttr.frame.origin.x - point.x)
+              yd = Float(layoutAttr.frame.origin.y - point.y)
+            }
+            
+            let dist = sqrtf(xd*xd + yd*yd)
+            if (dist < closestDist) {
+              closestDist = dist
+              toIndexPath = layoutAttr.indexPath
+            }
+          }
+          
+          return toIndexPath
+        }
+  
         // move item
         private func moveItemIfNeeded() {
                 var atIndexPath: NSIndexPath?
@@ -272,6 +329,9 @@ public class RAReorderableLayout: UICollectionViewFlowLayout, UIGestureRecognize
                 if let fakeCell = self.cellFakeView {
                         atIndexPath = fakeCell.indexPath
                         toIndexPath = self.collectionView!.indexPathForItemAtPoint(cellFakeView!.center)
+                  if toIndexPath == nil {
+                    toIndexPath = useOtherWayToFindDescIndexPath(atIndexPath)
+                  }
                 }
                 
                 if atIndexPath == nil || toIndexPath == nil {
